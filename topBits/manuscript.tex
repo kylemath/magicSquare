@@ -1,0 +1,46 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{graphicx}
+
+\title{Physical Probabilistic Computing: Implementation of Logic Gates Using Biased Spinning Tops}
+\author{Kyle Mathewson\\
+Department of Psychology\\
+University of Alberta}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We present a novel approach to physical computing using mechanically biased spinning tops as probabilistic computing elements. This work introduces a framework for implementing basic logic gates through physical probability manipulation, bridging concepts from mechanical computing and probabilistic processing. We demonstrate the feasibility of NOT, AND, and OR gates using this system and discuss implications for physical neural networks and probabilistic computing architectures.
+\end{abstract}
+
+\section{Introduction}
+The intersection of physical computing and probabilistic processing presents unique opportunities for novel computational architectures. While quantum computing has dominated recent discussions of probabilistic computation, simpler mechanical systems may offer practical advantages for certain applications. This paper introduces a system of biased spinning tops that can implement basic logic gates through controlled probability manipulation.
+
+\section{Methods}
+\subsection{Physical Implementation}
+Each computing element consists of a spinning top with adjustable internal weight distribution, allowing for controlled bias in its binary outcome states. The tops are arranged in addressable grids with automated spin and reset mechanisms, and state detection through conductive surfaces.
+
+\subsection{State Detection Mechanism}
+The binary state detection of each top is achieved through differential conductivity between the two faces of the top. When the top falls, it makes contact with a capacitive sensing grid embedded in the computing surface. One face of the top is designed with higher conductivity (e.g., through metallic coating or conductive polymer), while the other face maintains lower conductivity. This creates a detectable difference in capacitive coupling when the top settles, allowing reliable state readout without mechanical contacts. This approach provides several advantages:
+\begin{itemize}
+    \item Non-contact sensing reduces mechanical wear
+    \item Grid addressing enables parallel readout of multiple tops
+    \item Capacitive sensing is robust to environmental variations
+    \item The same mechanism could potentially enable position tracking during spin
+\end{itemize}
+
+The detection threshold between states can be calibrated through the grid's sensing parameters, providing flexibility in accommodating manufacturing variations in the tops' conductive properties.
+
+\subsection{Logic Gate Implementation}
+Basic logic gates are implemented through specific arrangements of these probabilistic elements:
+\begin{itemize}
+    \item NOT gate: Single inverted-bias top
+    \item AND gate: Three-top arrangement with threshold combination
+    \item OR gate: Three-top arrangement with cumulative probability
+\end{itemize}
+
+[Manuscript continues...]
+
+\end{document}
