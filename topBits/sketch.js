@@ -1,332 +1,187 @@
-class ProbabilisticTop3D {
-  constructor(x, y, z, bias = 0.5) {
-    this.pos = createVector(x, y, z);
-    this.bias = bias;
-    
-    // Initial orientation
-    this.rotation = createVector(0, 0, random(TWO_PI));
-    this.angularVel = createVector(0, 0, 0);
-    this.spinning = false;
-    
-    // Tilt parameters
-    this.tilt = 0;
-    this.tiltVel = 0;
-    this.tiltDirection = 0;
-    this.xTilt = 0;
-    this.zTilt = 0;
-    
-    // Precession
-    this.precessionAngle = 0;
-    this.precessionRate = 0;
-    
-    // Random destabilization point
-    this.destabilizeSpeed = random(0.1, 0.15);
-    this.initialTilt = random(0.05, 0.15);
+class SpinningTop {
+  constructor(x, y, z) {
+    // Position - set y to bodyHeight/2 so bottom touches floor
+    this.pos = createVector(x, this.bodyHeight/2, z);
     
     // Dimensions
     this.bodyHeight = 40;
     this.bodyWidth = 25;
-    this.stemHeight = 15;
-    this.stemRadius = 3;
-    this.pointHeight = 15;
     
-    this.debugMode = true;
+    // Physical properties
+    this.angularVel = 0;      // Angular velocity around y-axis
+    this.tilt = 0;            // Tilt angle from vertical
+    this.tiltDir = 0;         // Direction of tilt
+    this.rotation = 0;        // Current rotation angle
+    this.tiltVelocity = 0;    // Rate of change of tilt
     
-    // Add history arrays for plotting
-    this.timeHistory = [];
-    this.spinHistory = [];
-    this.wobbleHistory = [];
-    this.tiltHistory = [];
-    this.maxHistoryLength = 200;
+    // Physics constants
+    this.gravity = 0.098;     // Gravitational acceleration
+    this.momentOfInertia = 1000;  // Resistance to rotation
+    
+    // State
+    this.spinning = false;
+    this.falling = false;
+    this.currentFace = 0;
+    
+    // Energy loss coefficients
+    this.spinDamping = 0.997;
+    this.tiltDamping = 0.995;
+    
+    // Critical thresholds
+    this.minSpinSpeed = 0.5;
+    this.criticalTilt = PI/4;  // 45 degrees
   }
 
   spin() {
     this.spinning = true;
-    this.angularVel.y = random(0.3, 0.4);
+    this.falling = false;
     
-    // Reset all tilt parameters
-    this.tilt = 0;
-    this.tiltVel = 0;
-    this.tiltDirection = random(TWO_PI);
-    this.xTilt = 0;
-    this.zTilt = 0;
-    
-    this.precessionAngle = random(TWO_PI);
-    this.precessionRate = random(0.01, 0.02);
-    
-    // New random destabilization parameters
-    this.destabilizeSpeed = random(0.1, 0.15);
-    this.initialTilt = random(0.05, 0.15);
-    
-    if (this.debugMode) {
-      console.log('New spin with:');
-      console.log('Destabilize speed:', this.destabilizeSpeed);
-      console.log('Initial tilt:', this.initialTilt);
-      console.log('Tilt direction:', this.tiltDirection);
-    }
+    // Random initial conditions
+    this.angularVel = random(30, 40);
+    this.tilt = random(0.05, 0.15);
+    this.tiltDir = random(TWO_PI);
+    this.rotation = random(TWO_PI);
+    this.tiltVelocity = 0;
   }
 
   update() {
-    if (this.spinning) {
-      // Record dynamics data
-      this.timeHistory.push(frameCount);
-      this.spinHistory.push(this.angularVel.y);
-      this.wobbleHistory.push(sin(this.precessionAngle) * 0.05);
-      this.tiltHistory.push(this.tilt);
-      
-      if (this.timeHistory.length > this.maxHistoryLength) {
-        this.timeHistory.shift();
-        this.spinHistory.shift();
-        this.wobbleHistory.shift();
-        this.tiltHistory.shift();
-      }
-      
-      // Basic spin and precession
-      this.rotation.y += this.angularVel.y;
-      this.precessionAngle += this.precessionRate;
-      
-      // Faster decay rates
-      this.angularVel.y *= 0.995;
-      this.precessionRate *= 0.995;
+    if (!this.spinning) return;
 
-      // Destabilization phase
-      if (this.angularVel.y < this.destabilizeSpeed && this.tilt < this.initialTilt) {
-        // Faster initial tilt
-        let tiltIncrease = 0.002;
-        this.tilt += tiltIncrease;
+    if (!this.falling) {
+      // Update rotation based on angular velocity
+      this.rotation += this.angularVel * 0.01;
+      
+      // Calculate gyroscopic effect (resistance to tilting)
+      let gyroscopicTorque = (this.angularVel * this.angularVel) / this.momentOfInertia;
+      
+      // Calculate gravitational torque
+      let gravityTorque = this.gravity * sin(this.tilt);
+      
+      // Net acceleration of tilt
+      let tiltAccel = gravityTorque - gyroscopicTorque * sin(this.tilt);
+      
+      // Update tilt velocity and position
+      this.tiltVelocity += tiltAccel;
+      this.tiltVelocity *= this.tiltDamping;
+      this.tilt += this.tiltVelocity;
+      
+      // Apply damping to spin
+      this.angularVel *= this.spinDamping;
+      
+      // Check for transition to falling state
+      if (this.tilt > this.criticalTilt || this.angularVel < this.minSpinSpeed) {
+        this.falling = true;
         
-        // Update x and z components of tilt
-        this.xTilt = cos(this.tiltDirection) * this.tilt;
-        this.zTilt = sin(this.tiltDirection) * this.tilt;
-      }
-      // Full falling phase
-      else if (this.tilt >= this.initialTilt) {
-        // Calculate gravitational influence that increases as top tilts more
-        let gravityEffect = map(this.tilt, this.initialTilt, HALF_PI, 0.001, 0.01);
+        // Determine final face based on current rotation and momentum
+        let angle = this.rotation % TWO_PI;
+        if (angle < 0) angle += TWO_PI;
+        this.currentFace = floor(angle / (PI/2)) % 4;
         
-        // Stronger influences for more decisive fall
-        let spinInfluence = sin(this.rotation.y) * 0.001;
-        let precessionInfluence = sin(this.precessionAngle) * 0.001;
-        
-        // Add momentum based on top's "mass" (volume)
-        let volume = this.bodyWidth * this.bodyWidth * this.bodyHeight;
-        let momentumFactor = volume / 10000;  // Scale factor to keep values reasonable
-        
-        // Combine all forces with increased gravity and momentum
-        this.tiltVel += (gravityEffect * momentumFactor) + spinInfluence + precessionInfluence;
-        
-        // Stronger damping as we get closer to horizontal to prevent bouncing
-        let dampingFactor = map(this.tilt, this.initialTilt, HALF_PI, 0.995, 0.95);
-        this.tiltVel *= dampingFactor;
-        
-        this.tilt += this.tiltVel;
-        
-        // Update x and z components
-        this.xTilt = cos(this.tiltDirection) * this.tilt;
-        this.zTilt = sin(this.tiltDirection) * this.tilt;
-        
-        // Stop when fallen - ensure it's very close to horizontal
-        if (this.tilt > HALF_PI - 0.01) {  // Even closer to horizontal
-          this.spinning = false;
-          this.tilt = HALF_PI;  // Exactly horizontal
-          this.xTilt = cos(this.tiltDirection) * this.tilt;
-          this.zTilt = sin(this.tiltDirection) * this.tilt;
-          
-          let angle = (this.rotation.y % TWO_PI);
-          if (angle < 0) angle += TWO_PI;
-          
-          if (this.debugMode) {
-            console.log('Landed!');
-            console.log('Final Y rotation:', angle);
-            console.log('Final tilt:', this.tilt);
-            console.log('Tilt direction:', this.tiltDirection);
-            console.log('Final X tilt:', this.xTilt);
-            console.log('Final Z tilt:', this.zTilt);
-          }
+        // Add some randomness based on remaining angular momentum
+        if (random() < this.tiltVelocity * 2) {
+          this.currentFace = (this.currentFace + 1) % 4;
         }
+        
+        // Set fall direction based on chosen face
+        this.tiltDir = this.currentFace * HALF_PI;
+      }
+    } else {
+      // Accelerate the fall with gravity
+      this.tiltVelocity += this.gravity * 0.1;
+      this.tilt = min(this.tilt + this.tiltVelocity, HALF_PI);
+      
+      // Gradually align with target face
+      let targetRotation = this.currentFace * HALF_PI;
+      this.rotation = lerp(this.rotation, targetRotation, 0.1);
+      
+      // Decay spin during fall
+      this.angularVel *= 0.95;
+      
+      // Stop when flat
+      if (this.tilt >= HALF_PI - 0.01) {
+        this.spinning = false;
+        this.tilt = HALF_PI;
+        this.rotation = targetRotation;
+        console.log("Landed on face:", this.currentFace);
       }
     }
   }
 
   draw() {
     push();
-    let heightOffset = this.bodyHeight/2 * sin(this.tilt);
-    translate(this.pos.x, this.pos.y - heightOffset, this.pos.z);
+    translate(this.pos.x, this.pos.y, this.pos.z);
     
-    // Apply rotations in consistent order
-    rotateY(this.rotation.y);
-    if (this.spinning) {
-      rotateX(sin(this.precessionAngle) * 0.05);
-      rotateZ(cos(this.precessionAngle) * 0.05);
-    }
-    // Apply both x and z tilts
-    rotateX(this.xTilt);
-    rotateZ(this.zTilt);
+    // Remove the initial height offset and only adjust for tilt
+    let heightOffset = this.bodyHeight/2 * (1 - cos(this.tilt));
+    translate(0, -heightOffset, 0);
     
-    // Draw the body parts
+    // Apply rotations
+    rotateY(this.rotation);
+    rotateX(cos(this.tiltDir) * this.tilt);
+    rotateZ(sin(this.tiltDir) * this.tilt);
+    
+    // Draw body
     push();
     normalMaterial();
-    
-    // Main body
-    push();
-    translate(0, -(this.bodyHeight/2 + this.pointHeight), 0);
+    translate(0, -this.bodyHeight/2, 0);
     box(this.bodyWidth, this.bodyHeight, this.bodyWidth);
-    pop();
     
-    // Stem
-    push();
-    translate(0, -(this.bodyHeight + this.pointHeight + this.stemHeight/2), 0);
-    cylinder(this.stemRadius, this.stemHeight, 8, 1, true, true);
+    // Draw point
+    translate(0, this.bodyHeight/2, 0);
+    cone(this.bodyWidth/2, this.bodyHeight/4);
     pop();
-    
-    // Point
-    push();
-    translate(0, -this.pointHeight, 0);
-    cone(this.bodyWidth/2, this.pointHeight);
-    pop();
-    
-    // Draw faces with numbers only
-    translate(0, -(this.bodyHeight/2 + this.pointHeight), 0);
     
     // Draw numbered faces
+    push();
+    translate(0, -this.bodyHeight/2, 0);
     for (let i = 0; i < 4; i++) {
       push();
       rotateY(i * HALF_PI);
-      translate(0, 0, this.bodyWidth/2 + 2);
-      fill(200);  // All faces gray for now
+      translate(0, 0, this.bodyWidth/2 + 0.1);
+      fill(200);
       plane(this.bodyWidth * 0.9, this.bodyHeight * 0.9);
       
-      // Move text slightly in front of the face
-      translate(0, 0, 0.5);
+      // Number
       fill(0);
       textSize(20);
       textAlign(CENTER, CENTER);
-      textFont(defaultFont);
       text(i.toString(), 0, 0);
       pop();
     }
-    
     pop();
-    pop();
-  }
-
-  drawDynamicsPlot() {
-    push();
-    translate(-width/4, height/3);  // Position plot in bottom left
-    
-    // Draw axes
-    stroke(0);
-    line(0, 0, 200, 0);  // X axis
-    line(0, -100, 0, 100);  // Y axis
-    
-    // Draw legend
-    textAlign(LEFT);
-    textSize(12);
-    fill(255, 0, 0); text("Spin", 210, -80);
-    fill(0, 255, 0); text("Wobble", 210, -60);
-    fill(0, 0, 255); text("Tilt", 210, -40);
-    
-    // Plot histories
-    noFill();
-    
-    // Spin (red)
-    stroke(255, 0, 0);
-    beginShape();
-    for (let i = 0; i < this.spinHistory.length; i++) {
-      let x = map(i, 0, this.maxHistoryLength, 0, 200);
-      let y = map(this.spinHistory[i], 0, 0.15, 0, -100);
-      vertex(x, y);
-    }
-    endShape();
-    
-    // Wobble (green)
-    stroke(0, 255, 0);
-    beginShape();
-    for (let i = 0; i < this.wobbleHistory.length; i++) {
-      let x = map(i, 0, this.maxHistoryLength, 0, 200);
-      let y = map(this.wobbleHistory[i], -0.05, 0.05, -100, 100);
-      vertex(x, y);
-    }
-    endShape();
-    
-    // Tilt (blue)
-    stroke(0, 0, 255);
-    beginShape();
-    for (let i = 0; i < this.tiltHistory.length; i++) {
-      let x = map(i, 0, this.maxHistoryLength, 0, 200);
-      let y = map(this.tiltHistory[i], 0, HALF_PI, 0, 100);
-      vertex(x, y);
-    }
-    endShape();
     
     pop();
   }
 }
 
 let spinTop;
-let defaultFont;
-let resetButton;
-let rotateButton;
 let spinButton;
-
-function preload() {
-  defaultFont = loadFont('https://cdnjs.cloudflare.com/ajax/libs/topcoat/0.8.0/font/SourceCodePro-Bold.otf');
-}
+let resetButton;
 
 function setup() {
   createCanvas(600, 400, WEBGL);
-  spinTop = new ProbabilisticTop3D(0, 0, 0, 0.5);
   
-  // Create buttons in 2D screen space
-  resetButton = createButton('Reset');
-  resetButton.position(20, 20);
-  resetButton.mousePressed(resetTop);
-  
-  rotateButton = createButton('Rotate');
-  rotateButton.position(80, 20);
-  rotateButton.mousePressed(rotateTop);
-  rotateButton.attribute('disabled', ''); // Start disabled
+  // Create top with proper initial height
+  spinTop = new SpinningTop(0, 20, 0);  // y=20 (half of bodyHeight)
   
   spinButton = createButton('Spin');
-  spinButton.position(140, 20);
-  spinButton.mousePressed(startSpin);
-  spinButton.attribute('disabled', ''); // Start disabled
+  spinButton.position(20, 20);
+  spinButton.mousePressed(() => spinTop.spin());
   
-  ambientLight(60);
-  directionalLight(255, 255, 255, -1, 1, -1);
-  textFont(defaultFont);
-}
-
-function resetTop() {
-  // Reset top to initial state
-  spinTop = new ProbabilisticTop3D(0, 0, 0, 0.5);
-  rotateButton.removeAttribute('disabled'); // Enable rotate button
-  spinButton.removeAttribute('disabled');   // Enable spin button
-}
-
-function rotateTop() {
-  // Randomly rotate the top without spinning
-  spinTop.rotation.y = random(TWO_PI);
-  if (spinTop.debugMode) {
-    console.log('Rotated to:', spinTop.rotation.y);
-  }
-}
-
-function startSpin() {
-  spinTop.spin();
-  rotateButton.attribute('disabled', ''); // Disable rotate until next reset
-  spinButton.attribute('disabled', '');   // Disable spin until next reset
+  resetButton = createButton('Reset');
+  resetButton.position(80, 20);
+  resetButton.mousePressed(() => spinTop = new SpinningTop(0, 0, 0));
 }
 
 function draw() {
   background(255);
   orbitControl();
   
-  // Set initial camera angle to see two faces
+  // Set camera angle
   rotateX(-0.6);
   rotateY(-PI/4);
   
-  // Draw ground plane
+  // Draw ground
   push();
   translate(0, 0, 0);
   rotateX(HALF_PI);
@@ -334,7 +189,7 @@ function draw() {
   plane(200, 200);
   pop();
   
+  // Update and draw top
   spinTop.update();
   spinTop.draw();
-  spinTop.drawDynamicsPlot();  // Add the dynamics plot
 }

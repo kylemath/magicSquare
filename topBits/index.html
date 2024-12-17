@@ -1,9 +1,34 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <title>Spinning Top Simulation</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
-    <script src="sketch.js"></script>
+    <style>
+        body { 
+            margin: 0; 
+            display: flex; 
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #mainCanvas { 
+            flex: 1; 
+        }
+        #plotsCanvas { 
+            width: 500px;
+            height: 450px;
+            position: absolute;
+            right: 25%;
+            top: 10vh;
+            background: white;
+            z-index: 1;
+        }
+    </style>
 </head>
 <body>
+    <div id="mainCanvas"></div>
+    <div id="plotsCanvas"></div>
+    <script src="sketch.js"></script>
 </body>
 </html>
